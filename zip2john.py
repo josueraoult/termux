@@ -1,39 +1,75 @@
-import subprocess
-import os
+import sqlite3
+import getpass
 
-def extract_hash_from_zip(zip_file, hash_file):
-    # Run zip2john and write the output to a hash file
-    with open(hash_file, 'w') as f:
-        subprocess.run(['zip2john', zip_file], stdout=f)
+# Initialiser et configurer la base de données
+def init_db():
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
-def crack_zip_password(hash_file, wordlist):
-    # Run john the ripper on the hash file using the provided wordlist
-    result = subprocess.run(['john', '--wordlist=' + wordlist, hash_file], capture_output=True, text=True)
-    print(result.stdout)
+# Inscription d'un nouvel utilisateur
+def register_user():
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    
+    username = input("Entrez votre nom d'utilisateur: ")
+    password = getpass.getpass("Entrez votre mot de passe: ")
+    
+    try:
+        cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+        conn.commit()
+        print("Inscription réussie!")
+    except sqlite3.IntegrityError:
+        print("Erreur: Ce nom d'utilisateur est déjà pris.")
+    
+    conn.close()
 
-def show_cracked_password(hash_file):
-    # Show the cracked password
-    result = subprocess.run(['john', '--show', hash_file], capture_output=True, text=True)
-    print(result.stdout)
+# Connexion d'un utilisateur existant
+def login_user():
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    
+    username = input("Entrez votre nom d'utilisateur: ")
+    password = getpass.getpass("Entrez votre mot de passe: ")
+    
+    cursor.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password))
+    user = cursor.fetchone()
+    
+    if user:
+        print("Connexion réussie!")
+    else:
+        print("Erreur: Nom d'utilisateur ou mot de passe incorrect.")
+    
+    conn.close()
 
-def main(zip_file, wordlist):
-    hash_file = 'zip_hash.txt'
+# Menu principal
+def main():
+    init_db()
     
-    # Extract hash from zip file
-    extract_hash_from_zip(zip_file, hash_file)
-    
-    # Crack the zip password
-    crack_zip_password(hash_file, wordlist)
-    
-    # Display the cracked password
-    show_cracked_password(hash_file)
-    
-    # Clean up hash file
-    if os.path.exists(hash_file):
-        os.remove(hash_file)
+    while True:
+        print("\n1. Inscription")
+        print("2. Connexion")
+        print("3. Quitter")
+        choice = input("Choisissez une option: ")
+        
+        if choice == '1':
+            register_user()
+        elif choice == '2':
+            login_user()
+        elif choice == '3':
+            print("Au revoir!")
+            break
+        else:
+            print("Option invalide. Veuillez réessayer.")
 
 if __name__ == "__main__":
-    zip_file = 'example.zip'  # Replace with your zip file
-    wordlist = 'wordlist.txt'  # Replace with your wordlist file
+    main()
     
-    main(zip_file, wordlist)
